@@ -49,6 +49,9 @@ test('saved sessions can be loaded into Quick Notes with transcript fallback', (
   assert.match(app, /Open in Quick Notes/);
   assert.match(app, /selectSessionForQuickNotes\(session\)/);
   assert.match(app, /TRANSCRIPT\\n' \+ session\.transcript/);
+  assert.match(app, /addTextDetails\(content, 'View transcript'/);
+  const finish = app.slice(app.indexOf('async function finishSave'), app.indexOf('async function saveQuickNote'));
+  assert.ok(finish.indexOf('await renderSessions();') < finish.indexOf('createSummary(transcriptText.trim()'));
 });
 
 test('live transcript has Romanian, English, Hungarian translation targets', () => {

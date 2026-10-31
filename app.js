@@ -59,11 +59,22 @@ async function createSummary(transcript, sourceLanguage, targetLanguage) {
   const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
   const token = localStorage.getItem('memora-summary-token') || '';
   if (!endpoint || !token) throw new Error('Configure the AI summary service below Quick notes.');
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ transcript, language: sourceLanguage, outputLanguage: targetLanguage })
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ transcript, language: sourceLanguage, outputLanguage: targetLanguage }),
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('AI summary timed out after 45 seconds.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) throw new Error(response.status === 404 ? 'AI summary service is not connected yet.' : 'AI summary request failed.');
   const data = await response.json();
   if (!data || !data.summary || typeof data.summary.executiveSummary !== 'string') {
@@ -225,7 +236,7 @@ async function selectSessionForQuickNotes(session) {
     $('quickNotesStatus').textContent = 'This recording has no saved transcript or summary.';
   }
   renderSessions().catch(() => {});
-  if (!recorder && transcriptNeedsTranslation) translateCurrentTranscript();
+  if (!recorder && transcriptNeedsTranslation) await translateCurrentTranscript();
 }
 
 function openDB() {
@@ -481,11 +492,28 @@ async function finishSave() {
       currentSession.sourceNotes = userNotes;
       currentSession.notes = userNotes;
       currentSession.mime = audio.type;
-      await saveSession(currentSession);
+      try {
+        await saveSession(currentSession);
+      } catch (audioSaveError) {
+        currentSession.blob = null;
+        currentSession.audioSaveError = 'Audio could not be stored; transcript and notes are saved.';
+        await saveSession(currentSession);
+        $('recordHint').textContent = currentSession.audioSaveError;
+      }
       selectedSessionId = currentSession.id;
       $('sessionNotes').dataset.sessionId = currentSession.id;
+      $('searchSessions').value = '';
       if (transcriptText.trim()) {
+        $('sessionNotes').value = [userNotes, 'SUMAR EXECUTIV\nSe generează sumarul AI. Până atunci, transcriptul complet este disponibil mai jos.', 'TRANSCRIPT\n' + transcriptText.trim()].filter(Boolean).join('\n\n');
+        $('quickNotesStatus').textContent = 'Transcript salvat. Se generează sumarul executiv…';
         $('recordHint').textContent = 'Transcript saved. Preparing executive summary…';
+      } else {
+        $('sessionNotes').value = [userNotes, 'Nu există un transcript disponibil pentru sumarizare. Înregistrarea audio a fost salvată.'].filter(Boolean).join('\n\n');
+        $('quickNotesStatus').textContent = 'Înregistrarea audio este salvată, dar browserul nu a furnizat un transcript.';
+      }
+      $('sessionNotes').dataset.generatedSummary = '';
+      await renderSessions();
+      if (transcriptText.trim()) {
         try {
           const targetLanguage = $('notesLanguage').value;
           const structuredSummary = await createSummary(transcriptText.trim(), currentSession.speechLanguage, targetLanguage);
@@ -511,6 +539,7 @@ async function finishSave() {
         $('recordHint').textContent = 'Audio saved. No transcript was available to summarize.';
       }
       await saveSession(currentSession);
+      await renderSessions();
       if (currentSession.summary) $('recordHint').textContent = 'Transcript and executive summary saved in Quick notes.';
     }
   } catch (error) {
@@ -787,10 +816,11 @@ $('summaryToken').value = localStorage.getItem('memora-summary-token') || '';
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (sessionStorage.getItem('memora-sw-version') === 'v7') return;
-    sessionStorage.setItem('memora-sw-version', 'v7');
+    if (sessionStorage.getItem('memora-sw-reloading') === '1') return;
+    sessionStorage.setItem('memora-sw-reloading', '1');
     location.reload();
   });
+  if (sessionStorage.getItem('memora-sw-reloading') === '1') sessionStorage.removeItem('memora-sw-reloading');
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
     .then(registration => registration.update())
     .catch(() => {});
