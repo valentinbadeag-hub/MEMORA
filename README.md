@@ -12,9 +12,9 @@ An iPhone needs an HTTPS website for microphone access and service-worker instal
 4. Wait for GitHub Pages to show the published HTTPS link.
 5. Open that link in Safari on your iPhone.
 6. Tap **Share → Add to Home Screen**. Turn on **Open as Web App** if shown, then tap **Add**.
-7. Launch MEMORA from the new Home Screen icon and allow microphone access.
+7. Launch MEMORA from the new Home Screen icon and allow microphone access. The shared AI service is ready without entering a token on each device.
 
-The AI provider key belongs on the summary service, never in the public app. Audio remains in browser storage; the transcript is sent to the configured AI service to generate the summary.
+The AI provider binding and service credentials stay on Cloudflare, never in the public app. Audio remains in browser storage; the transcript is sent to the shared AI service to generate summaries and translations. The public service is rate limited per IP; anyone who knows the app URL can try to use it, so monitor Worker usage and billing.
 
 ## Run checks on Windows
 
@@ -31,7 +31,7 @@ Install Node.js, open PowerShell in this folder, and run node --test --test-isol
 - Select a saved item by tapping its date or **Open in Quick Notes** to load its summary, notes, and transcript into the Quick notes editor. If an AI summary cannot be created, MEMORA still loads the full transcript and reports why the summary is missing.
 - The summary format includes an executive summary, key discussion points, decisions, action items (owner, when, how, where, why), and open questions. Missing details are labeled **Not specified**.
 - AI summaries and translations run through Cloudflare Workers AI using the multilingual Qwen model; this does not require an OpenAI API key. The free Workers AI allocation is 10,000 Neurons per day; limits and billing are controlled by Cloudflare.
-- Deploy `worker.js` using the included `wrangler.jsonc`, then add a `MEMORA_API_TOKEN` secret to the Worker. Enter the deployed Worker's URL ending in `/api/summarize` and the same token in **Quick notes → AI summary service setup**. Never commit the token to this repository.
+- Deploy `worker.js` using the included `wrangler.jsonc`. The Worker uses a Cloudflare AI binding and applies a limit of 20 summary/translation requests per minute per IP. No client token is required; do not put service secrets in the public repository.
 - Search the library by words or phrases. Results include transcript text and notes.
 - Use **Export audio** or **Export .txt** to keep a copy outside browser storage.
 
@@ -55,3 +55,4 @@ Install Node.js, open PowerShell in this folder, and run node --test --test-isol
 6. Redeploy the Worker whenever `worker.js` changes.
 
 Record only when people are aware and you have the necessary permission.
+
