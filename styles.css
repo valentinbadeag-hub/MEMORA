@@ -35,6 +35,9 @@ button:disabled{opacity:.35;cursor:not-allowed}
 .section-head{gap:12px}
 .live-label{font-size:11px;color:var(--muted);white-space:nowrap}
 .transcript{white-space:pre-wrap;line-height:1.55;font-size:14px;max-height:260px;overflow:auto;margin-top:18px}
+.transcript-translation-controls{display:flex;gap:9px;align-items:center}
+.transcript-translation-controls .session-search{flex:1;min-width:0}
+.transcript-translation-controls button{flex-shrink:0}
 .transcript.empty,.empty{color:#718096;font-size:13px}
 .row-actions{gap:18px;margin-top:14px}
 .text-btn{background:none;color:var(--blue);padding:5px 0;font-size:12px}

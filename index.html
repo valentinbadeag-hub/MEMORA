@@ -80,6 +80,17 @@
         <option value="hu-HU">Hungarian</option>
       </select>
       <div id="transcript" class="transcript empty" aria-live="polite">Your recognized speech will appear here when supported. Recording works independently.</div>
+      <label class="search-label" for="transcriptLanguage">Translate transcript to</label>
+      <div class="transcript-translation-controls">
+        <select id="transcriptLanguage" class="session-search">
+          <option value="ro">Română</option>
+          <option value="en">English</option>
+          <option value="hu">Magyar</option>
+        </select>
+        <button id="translateTranscript" class="secondary" type="button">Translate</button>
+      </div>
+      <p id="translationStatus" class="privacy-note" aria-live="polite">The original transcript is preserved; its translation appears below.</p>
+      <div id="translatedTranscript" class="transcript empty" aria-live="polite">Translated text will appear here.</div>
       <div class="row-actions">
         <button id="copyTranscript" class="text-btn">Copy transcript</button>
         <button id="downloadTranscript" class="text-btn">Export .txt</button>

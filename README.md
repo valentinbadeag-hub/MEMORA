@@ -24,11 +24,14 @@ Install Node.js, open PowerShell in this folder, and run node --test --test-isol
 
 - Tap **Start recording** and keep MEMORA in the foreground.
 - Choose Romanian, English, or Hungarian before recording. Browser speech recognition is optional and may be unavailable.
+- In **Live transcript**, choose Romanian, English, or Hungarian as the translation language. Changing this selection translates the visible transcript automatically; the original remains unchanged. Translations are cached with saved recordings.
 - Choose Romanian, English, or Hungarian as the summary language in Quick notes. The summary is generated in that language even when the conversation is in another language. Changing it translates the latest displayed summary; use **Translate summary to …** in the library for other saved conversations. Translations are cached locally, and you can search them.
 - Use **Quick notes** to save a decision, participant, or follow-up. During recording, a saved note is also attached to that recording.
 - After Finish, MEMORA saves the transcript and audio locally, then requests a structured executive summary. The summary appears in Quick notes and is searchable with the transcript.
+- Select a saved item by tapping its date or **Open in Quick Notes** to load its summary, notes, and transcript into the Quick notes editor. If an AI summary cannot be created, MEMORA still loads the full transcript and reports why the summary is missing.
 - The summary format includes an executive summary, key discussion points, decisions, action items (owner, when, how, where, why), and open questions. Missing details are labeled **Not specified**.
 - To enable AI summaries, deploy `worker.js` as a Cloudflare Worker with `OPENAI_API_KEY` and `MEMORA_API_TOKEN` secrets. Set the Worker route to `/api/summarize`, then enter its full URL and the same access token in **Quick notes → AI summary service setup**. Create a long random token and use it for `MEMORA_API_TOKEN`; do not commit provider keys or tokens to this repository.
+- After updating the app, redeploy `worker.js` to the same Worker so transcript translation is available through the same endpoint.
 - With the current Worker configuration, the service uses OpenAI `gpt-4o-mini`. OpenAI API billing is separate from ChatGPT subscriptions.
 - Search the library by words or phrases. Results include transcript text and notes.
 - Use **Export audio** or **Export .txt** to keep a copy outside browser storage.

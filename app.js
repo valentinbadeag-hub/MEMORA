@@ -72,6 +72,65 @@ async function createSummary(transcript, sourceLanguage, targetLanguage) {
   return data.summary;
 }
 
+function setTranslatedTranscript(text) {
+  const output = $('translatedTranscript');
+  output.textContent = text || 'Translated text will appear here.';
+  output.classList.toggle('empty', !text);
+}
+
+async function translateCurrentTranscript() {
+  const button = $('translateTranscript');
+  const targetLanguage = $('transcriptLanguage').value;
+  const sessionId = $('sessionNotes').dataset.sessionId;
+  let session = currentSession;
+  if (!recorder && sessionId) session = (await allSessions()).find(item => item.id === sessionId) || null;
+  const source = session && session.transcript ? session.transcript : transcriptText.trim();
+  if (!source) {
+    $('translationStatus').textContent = 'There is no transcript to translate yet.';
+    return;
+  }
+  const sourceLanguageCode = session && session.speechLanguage === 'ro-RO' ? 'ro' : session && session.speechLanguage === 'hu-HU' ? 'hu' : session && session.speechLanguage ? 'en' : '';
+  if (sourceLanguageCode && sourceLanguageCode === targetLanguage) {
+    setTranslatedTranscript(source);
+    $('translationStatus').textContent = 'The transcript is already in the selected language.';
+    return;
+  }
+  if (session && session.translations && session.translations[targetLanguage]) {
+    setTranslatedTranscript(session.translations[targetLanguage]);
+    $('translationStatus').textContent = 'Showing the saved translation.';
+    return;
+  }
+
+  button.disabled = true;
+  $('translationStatus').textContent = 'Translating transcript…';
+  setTranslatedTranscript('Translating…');
+  try {
+    const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
+    const token = localStorage.getItem('memora-summary-token') || '';
+    if (!endpoint || !token) throw new Error('Configure the AI summary service in Quick Notes first.');
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ operation: 'translate', transcript: source, outputLanguage: targetLanguage })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Translation service request failed.');
+    if (!result.translation || typeof result.translation !== 'string') throw new Error('Translation service returned no translated text.');
+    setTranslatedTranscript(result.translation);
+    $('translationStatus').textContent = 'Translation ready. The original transcript is unchanged.';
+    if (session) {
+      session.translations = session.translations || {};
+      session.translations[targetLanguage] = result.translation;
+      if (!recorder) await saveSession(session);
+    }
+  } catch (error) {
+    setTranslatedTranscript('');
+    $('translationStatus').textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function summaryForLanguage(session, language) {
   if (session.summaryByLanguage && session.summaryByLanguage[language]) return session.summaryByLanguage[language];
   if (session.summary && session.summaryLanguage === language) return session.summary;
@@ -112,6 +171,24 @@ async function selectSessionForQuickNotes(session) {
   selectedSessionId = session.id;
   const notes = $('sessionNotes');
   notes.dataset.sessionId = session.id;
+  let transcriptNeedsTranslation = false;
+  if (!recorder) {
+    transcriptText = session.transcript || '';
+    $('transcript').textContent = transcriptText || 'This saved item has no transcript.';
+    $('transcript').classList.toggle('empty', !transcriptText);
+    $('wordCount').textContent = String(transcriptText.trim() ? transcriptText.trim().split(/\s+/).length : 0);
+    const speechLanguage = session.speechLanguage;
+    if (speechLanguage && Array.from($('speechLanguage').options).some(option => option.value === speechLanguage)) {
+      $('speechLanguage').value = speechLanguage;
+    }
+    const translation = (session.translations || {})[$('transcriptLanguage').value] || '';
+    setTranslatedTranscript(translation);
+    const targetLanguage = $('transcriptLanguage').value;
+    const speechCode = session.speechLanguage === 'ro-RO' ? 'ro' : session.speechLanguage === 'hu-HU' ? 'hu' : session.speechLanguage ? 'en' : '';
+    $('translationStatus').textContent = translation ? 'Showing the saved translation.' : speechCode === targetLanguage ? 'The transcript is already in the selected language.' : 'Preparing translation…';
+    if (!translation && transcriptText && speechCode && speechCode === targetLanguage) setTranslatedTranscript(transcriptText);
+    transcriptNeedsTranslation = Boolean(!translation && transcriptText && speechCode !== targetLanguage);
+  }
   const language = $('notesLanguage').value;
   const sourceNotes = session.sourceNotes || (session.summary ? notesWithoutGeneratedSummary(session.notes, session.summary) : session.notes || '');
   let summary = summaryForLanguage(session, language);
@@ -148,6 +225,7 @@ async function selectSessionForQuickNotes(session) {
     $('quickNotesStatus').textContent = 'This recording has no saved transcript or summary.';
   }
   renderSessions().catch(() => {});
+  if (!recorder && transcriptNeedsTranslation) translateCurrentTranscript();
 }
 
 function openDB() {
@@ -639,6 +717,13 @@ async function renderSessions() {
 $('recordBtn').addEventListener('click', startRecording);
 $('pauseBtn').addEventListener('click', pauseRecording);
 $('stopBtn').addEventListener('click', stopRecording);
+$('translateTranscript').addEventListener('click', translateCurrentTranscript);
+$('transcriptLanguage').value = localStorage.getItem('memora-transcript-language') || 'ro';
+$('transcriptLanguage').addEventListener('change', () => {
+  localStorage.setItem('memora-transcript-language', $('transcriptLanguage').value);
+  if (transcriptText.trim()) translateCurrentTranscript();
+  else $('translationStatus').textContent = 'There is no transcript to translate yet.';
+});
 $('saveNoteBtn').addEventListener('click', saveQuickNote);
 $('searchSessions').addEventListener('input', () => renderSessions().catch(() => {}));
 $('notesLanguage').value = localStorage.getItem('memora-notes-language') || 'ro';
@@ -701,7 +786,14 @@ $('summaryEndpoint').value = localStorage.getItem('memora-summary-endpoint') || 
 $('summaryToken').value = localStorage.getItem('memora-summary-token') || '';
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (sessionStorage.getItem('memora-sw-version') === 'v7') return;
+    sessionStorage.setItem('memora-sw-version', 'v7');
+    location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+    .then(registration => registration.update())
+    .catch(() => {});
 }
 renderSessions().catch(() => {
   $('sessions').innerHTML = '<div class="empty">Storage is unavailable in this browser.</div>';

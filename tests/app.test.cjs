@@ -51,6 +51,15 @@ test('saved sessions can be loaded into Quick Notes with transcript fallback', (
   assert.match(app, /TRANSCRIPT\\n' \+ session\.transcript/);
 });
 
+test('live transcript has Romanian, English, Hungarian translation targets', () => {
+  const html = read('index.html');
+  const app = read('app.js');
+  const worker = read('worker.js');
+  assert.match(html, /id="transcriptLanguage"[\s\S]*value="ro"[\s\S]*value="en"[\s\S]*value="hu"/);
+  assert.match(app, /operation: 'translate'/);
+  assert.match(worker, /body\.operation === 'translate'/);
+});
+
 test('manifest icons and offline cache assets exist', () => {
   const manifest = JSON.parse(read('manifest.webmanifest'));
   for (const icon of manifest.icons) assert.equal(fs.existsSync(path.join(root, icon.src)), true, icon.src);
