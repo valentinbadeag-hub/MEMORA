@@ -81,10 +81,17 @@ async function translateSessionSummary(session, targetLanguage) {
   if (!session.transcript) throw new Error('This note has no transcript to translate.');
   session.summaryByLanguage = session.summaryByLanguage || {};
   const structuredSummary = await createSummary(session.transcript, session.speechLanguage || 'auto', targetLanguage);
-  const formatted = formatSummaryForNotes(structuredSummary);
+  const formatted = formatSummaryForNotes(structuredSummary, targetLanguage);
+  const previousSummary = session.summary || '';
+  if (!session.sourceNotes) {
+    session.sourceNotes = previousSummary && session.notes && session.notes.endsWith(previousSummary)
+      ? session.notes.slice(0, -previousSummary.length).trim()
+      : session.notes || '';
+  }
   session.summaryByLanguage[targetLanguage] = formatted;
   session.summary = formatted;
   session.summaryLanguage = targetLanguage;
+  session.notes = [session.sourceNotes || '', formatted].filter(Boolean).join('\n\n');
   await saveSession(session);
   const notes = $('sessionNotes');
   if (notes.dataset.sessionId === session.id) {
@@ -620,3 +627,4 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 renderSessions().catch(() => {
   $('sessions').innerHTML = '<div class="empty">Storage is unavailable in this browser.</div>';
 });
+
