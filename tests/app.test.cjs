@@ -61,6 +61,8 @@ test('live transcript has Romanian, English, Hungarian translation targets', () 
   assert.match(html, /id="transcriptLanguage"[\s\S]*value="ro"[\s\S]*value="en"[\s\S]*value="hu"/);
   assert.match(app, /operation: 'translate'/);
   assert.match(worker, /body\.operation === 'translate'/);
+  assert.match(html, /MEMORA · Build 9/);
+  assert.match(app, /AI service is not configured/);
 });
 
 test('manifest icons and offline cache assets exist', () => {

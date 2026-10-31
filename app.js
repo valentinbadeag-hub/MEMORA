@@ -16,6 +16,11 @@ const DB_NAME = 'memora-local';
 const STORE = 'sessions';
 const DEFAULT_SUMMARY_ENDPOINT = '';
 
+function showSummarySetup(message) {
+  $('summarySettings').open = true;
+  $('summarySettingsStatus').textContent = message;
+}
+
 function formatSummaryForNotes(summary, language) {
   const labels = {
     ro: { exec: 'SUMAR EXECUTIV', context: 'CONTEXT', what: 'Ce', when: 'Când', how: 'Cum', where: 'Unde', why: 'De ce', points: 'PUNCTE DISCUTATE', decisions: 'DECIZII', actions: 'ACȚIUNI', open: 'ÎNTREBĂRI DESCHISE / RISCURI', none: 'Niciuna identificată', unspecified: 'Nespecificat', owner: 'Responsabil' },
@@ -58,7 +63,10 @@ function summaryLanguageName(language) {
 async function createSummary(transcript, sourceLanguage, targetLanguage) {
   const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
   const token = localStorage.getItem('memora-summary-token') || '';
-  if (!endpoint || !token) throw new Error('Configure the AI summary service below Quick notes.');
+  if (!endpoint || !token) {
+    showSummarySetup('AI summaries and translations need a service URL and access token. Configure both here.');
+    throw new Error('AI service is not configured.');
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45000);
   let response;
@@ -75,7 +83,10 @@ async function createSummary(transcript, sourceLanguage, targetLanguage) {
   } finally {
     clearTimeout(timeout);
   }
-  if (!response.ok) throw new Error(response.status === 404 ? 'AI summary service is not connected yet.' : 'AI summary request failed.');
+  if (!response.ok) {
+    if (response.status === 404) showSummarySetup('The configured AI service URL was not found. Check that it ends with /api/summarize.');
+    throw new Error(response.status === 404 ? 'AI summary service is not connected yet.' : 'AI summary request failed.');
+  }
   const data = await response.json();
   if (!data || !data.summary || typeof data.summary.executiveSummary !== 'string') {
     throw new Error('AI summary service returned an invalid response.');
@@ -118,14 +129,20 @@ async function translateCurrentTranscript() {
   try {
     const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
     const token = localStorage.getItem('memora-summary-token') || '';
-    if (!endpoint || !token) throw new Error('Configure the AI summary service in Quick Notes first.');
+    if (!endpoint || !token) {
+      showSummarySetup('AI transcript translation needs a service URL and access token. Configure both here.');
+      throw new Error('AI service is not configured.');
+    }
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ operation: 'translate', transcript: source, outputLanguage: targetLanguage })
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || 'Translation service request failed.');
+    if (!response.ok) {
+      if (response.status === 404) showSummarySetup('The configured AI service URL was not found. Check that it ends with /api/summarize.');
+      throw new Error(result.error || 'Translation service request failed.');
+    }
     if (!result.translation || typeof result.translation !== 'string') throw new Error('Translation service returned no translated text.');
     setTranslatedTranscript(result.translation);
     $('translationStatus').textContent = 'Translation ready. The original transcript is unchanged.';
