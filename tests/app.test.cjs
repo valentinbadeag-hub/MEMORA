@@ -61,7 +61,7 @@ test('live transcript has Romanian, English, Hungarian translation targets', () 
   assert.match(html, /id="transcriptLanguage"[\s\S]*value="ro"[\s\S]*value="en"[\s\S]*value="hu"/);
   assert.match(app, /operation: 'translate'/);
   assert.match(worker, /body\.operation === 'translate'/);
-  assert.match(html, /MEMORA · Build 10/);
+  assert.match(html, /MEMORA · Build 11/);
   assert.match(app, /AI service is not configured/);
   assert.match(worker, /@cf\/qwen\/qwen3-30b-a3b-fp8/);
   const wrangler = JSON.parse(read('wrangler.jsonc'));
@@ -82,6 +82,7 @@ test('saving AI settings checks the authenticated Worker health endpoint', () =>
   assert.match(app, /const healthUrl = endpoint\.replace\(\/\\\/api\\\/summarize/);
   assert.match(app, /Checking the service and token/);
   assert.match(app, /Token rejected/);
+  assert.match(app, /AI is not connected on this device yet/);
   assert.match(worker, /pathname === '\/api\/health'/);
   assert.match(worker, /aiConfigured: true/);
   assert.match(worker, /Access-Control-Allow-Methods': 'GET, POST, OPTIONS'/);
@@ -91,7 +92,7 @@ test('manifest icons and offline cache assets exist', () => {
   const manifest = JSON.parse(read('manifest.webmanifest'));
   for (const icon of manifest.icons) assert.equal(fs.existsSync(path.join(root, icon.src)), true, icon.src);
   const sw = read('sw.js');
-  assert.match(sw, /memora-v11/);
+  assert.match(sw, /memora-v12/);
   const assets = Array.from(sw.matchAll(/["']\.\/([^"']+)["']/g), match => match[1]).filter(Boolean);
   for (const asset of assets) assert.equal(fs.existsSync(path.join(root, asset)), true, asset);
 });
