@@ -55,7 +55,7 @@
       <button id="saveNoteBtn" class="secondary save-note">Save note</button>
       <details id="summarySettings" class="summary-settings">
         <summary>AI summary service setup</summary>
-        <p class="privacy-note">Required for automatic summaries. Configure a trusted service URL and its access token. Your transcript is sent to that service; recordings remain on this device.</p>
+        <p class="privacy-note">The service URL is filled in automatically. Paste your access token on each device, then save to check that the AI service can be reached. Transcripts are sent to the service; recordings remain on this device.</p>
         <label class="search-label" for="summaryEndpoint">Summary service URL</label>
         <input id="summaryEndpoint" class="session-search" type="url" placeholder="https://your-service.example.com/api/summarize" autocomplete="url">
         <label class="search-label" for="summaryToken">Access token</label>
@@ -104,7 +104,7 @@
       <div id="sessions" class="sessions"><div class="empty">Loading your saved items…</div></div>
     </section>
 
-    <footer>MEMORA · Build 9 · Local storage · No account required</footer>
+    <footer>MEMORA · Build 10 · Local storage · No account required</footer>
   </main>
   <script src="search-utils.js"></script>
   <script src="app.js"></script>
