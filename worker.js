@@ -13,7 +13,7 @@ async function runModel(env, messages, maxTokens, temperature) {
 function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin': ALLOWED_ORIGINS.has(origin) ? origin : 'https://valentinbadeag-hub.github.io',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Vary': 'Origin'
   };
@@ -30,7 +30,14 @@ export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(origin) });
-    if (request.method !== 'POST' || new URL(request.url).pathname !== '/api/summarize') {
+    const pathname = new URL(request.url).pathname;
+    if (pathname === '/api/health') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, origin);
+      if (!env.AI || !env.MEMORA_API_TOKEN) return json({ error: 'Summary service is not configured.' }, 503, origin);
+      if (request.headers.get('Authorization') !== 'Bearer ' + env.MEMORA_API_TOKEN) return json({ error: 'Unauthorized' }, 401, origin);
+      return json({ ok: true, aiConfigured: true }, 200, origin);
+    }
+    if (request.method !== 'POST' || pathname !== '/api/summarize') {
       return json({ error: 'Not found' }, 404, origin);
     }
     if (!env.AI || !env.MEMORA_API_TOKEN) return json({ error: 'Summary service is not configured.' }, 503, origin);
