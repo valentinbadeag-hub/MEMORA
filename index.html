@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MEMORA">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <title>MEMORA — Conversation Memory</title>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">M</div>
+        <div><h1>MEMORA</h1><p>Conversation memory</p></div>
+      </div>
+      <span id="statusPill" class="pill idle" aria-live="polite"><i></i> Ready</span>
+    </header>
+
+    <section class="hero card" aria-labelledby="sessionHeading">
+      <div id="sessionHeading" class="eyebrow">CURRENT SESSION</div>
+      <div id="timer" class="timer" aria-live="off">00:00:00</div>
+      <div class="meter" aria-label="Recording status"><span id="meterFill"></span></div>
+      <p id="recordHint" class="muted">Your microphone is off.</p>
+      <div class="controls">
+        <button id="recordBtn" class="primary"><span class="rec-dot"></span> Start recording</button>
+        <button id="pauseBtn" class="secondary" disabled>Pause</button>
+        <button id="stopBtn" class="stop" disabled>Finish</button>
+      </div>
+      <p class="notice">Recording works only while this app stays open. Keep your iPhone awake. Tell people when you record and get their permission.</p>
+    </section>
+
+    <section class="grid" aria-label="Session statistics">
+      <article class="card stat"><span class="muted">Saved items</span><strong id="sessionCount">0</strong></article>
+      <article class="card stat"><span class="muted">Live transcript words</span><strong id="wordCount">0</strong></article>
+    </section>
+
+    <section class="card">
+      <div class="section-head"><div><h2>Quick notes</h2><p class="muted">Add a decision, person, or follow-up to search later.</p></div></div>
+      <label class="search-label" for="sessionNotes">Notes for this recording or a quick note</label>
+      <textarea id="sessionNotes" class="notes-input" rows="3" placeholder="For example: I agreed to send Alex the proposal by Friday."></textarea>
+      <button id="saveNoteBtn" class="secondary save-note">Save note</button>
+      <p class="privacy-note">Notes, recordings, and transcripts are stored in this browser on this device.</p>
+    </section>
+
+    <section class="card transcript-card">
+      <div class="section-head">
+        <div><h2>Live transcript</h2><p class="muted">Optional browser speech recognition; it may not be available in iPhone Safari.</p></div>
+        <span class="live-label" id="speechLabel">Standby</span>
+      </div>
+      <p class="privacy-note">This first phone version records audio and can display browser transcripts. AI summaries and action extraction are not included yet.</p>
+      <label class="search-label" for="speechLanguage">Speech language</label>
+      <select id="speechLanguage" class="session-search">
+        <option value="ro-RO">Romanian</option>
+        <option value="en-GB">English (UK)</option>
+        <option value="en-US">English (US)</option>
+      </select>
+      <div id="transcript" class="transcript empty" aria-live="polite">Your recognized speech will appear here when supported. Recording works independently.</div>
+      <div class="row-actions">
+        <button id="copyTranscript" class="text-btn">Copy transcript</button>
+        <button id="downloadTranscript" class="text-btn">Export .txt</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-head"><div><h2>Conversation library</h2><p class="muted">Search saved transcripts and your notes.</p></div></div>
+      <label class="search-label" for="searchSessions">Search your memory</label>
+      <input id="searchSessions" class="session-search" type="search" placeholder="Search words or phrases…" autocomplete="off">
+      <div id="sessions" class="sessions"><div class="empty">Loading your saved items…</div></div>
+    </section>
+
+    <footer>MEMORA · Local storage · No account required</footer>
+  </main>
+  <script src="search-utils.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+
