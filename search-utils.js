@@ -8,6 +8,7 @@
     const content = [
       new Date(session.created).toLocaleString(),
       session.transcript || '',
+      session.summary || '',
       session.notes || ''
     ].join(' ').toLocaleLowerCase();
     return content.includes(query.toLocaleLowerCase());

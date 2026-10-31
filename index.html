@@ -42,10 +42,20 @@
     </section>
 
     <section class="card">
-      <div class="section-head"><div><h2>Quick notes</h2><p class="muted">Add a decision, person, or follow-up to search later.</p></div></div>
+      <div class="section-head"><div><h2>Quick notes</h2><p class="muted">Executive summary, decisions, actions, and your own notes.</p></div></div>
       <label class="search-label" for="sessionNotes">Notes for this recording or a quick note</label>
-      <textarea id="sessionNotes" class="notes-input" rows="3" placeholder="For example: I agreed to send Alex the proposal by Friday."></textarea>
+      <textarea id="sessionNotes" class="notes-input" rows="8" placeholder="After a recording, the AI executive summary will appear here. You can also add a decision, person, or follow-up."></textarea>
       <button id="saveNoteBtn" class="secondary save-note">Save note</button>
+      <details class="summary-settings">
+        <summary>AI summary service setup</summary>
+        <p class="privacy-note">Required for automatic summaries. Configure a trusted service URL and its access token. Your transcript is sent to that service; recordings remain on this device.</p>
+        <label class="search-label" for="summaryEndpoint">Summary service URL</label>
+        <input id="summaryEndpoint" class="session-search" type="url" placeholder="https://your-service.example.com/api/summarize" autocomplete="url">
+        <label class="search-label" for="summaryToken">Access token</label>
+        <input id="summaryToken" class="session-search" type="password" autocomplete="off">
+        <button id="saveSummarySettings" class="secondary save-note">Save AI settings</button>
+        <p id="summarySettingsStatus" class="privacy-note" aria-live="polite"></p>
+      </details>
       <p class="privacy-note">Notes, recordings, and transcripts are stored in this browser on this device.</p>
     </section>
 
@@ -54,7 +64,7 @@
         <div><h2>Live transcript</h2><p class="muted">Optional browser speech recognition; it may not be available in iPhone Safari.</p></div>
         <span class="live-label" id="speechLabel">Standby</span>
       </div>
-      <p class="privacy-note">This first phone version records audio and can display browser transcripts. AI summaries and action extraction are not included yet.</p>
+      <p class="privacy-note">AI summaries use the transcript and require a configured secure summary service. Audio stays on this device.</p>
       <label class="search-label" for="speechLanguage">Speech language</label>
       <select id="speechLanguage" class="session-search">
         <option value="ro-RO">Romanian</option>

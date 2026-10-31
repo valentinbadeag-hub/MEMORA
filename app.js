@@ -13,6 +13,47 @@ let currentSession = null;
 
 const DB_NAME = 'memora-local';
 const STORE = 'sessions';
+const DEFAULT_SUMMARY_ENDPOINT = '';
+
+function formatSummaryForNotes(summary) {
+  const lines = ['EXECUTIVE SUMMARY', summary.executiveSummary || 'Not specified.'];
+  if (summary.context) {
+    lines.push('', 'CONTEXT');
+    for (const [label, key] of [['What', 'what'], ['When', 'when'], ['How', 'how'], ['Where', 'where'], ['Why', 'why']]) {
+      lines.push(label + ': ' + (summary.context[key] || 'Not specified'));
+    }
+  }
+  const addList = (heading, items, format) => {
+    lines.push('', heading);
+    if (!items || !items.length) lines.push('• None identified.');
+    else items.forEach(item => lines.push('• ' + format(item)));
+  };
+  addList('KEY DISCUSSION', summary.keyPoints, item => item);
+  addList('DECISIONS', summary.decisions, item => item);
+  addList('ACTIONS', summary.actions, item => {
+    const parts = [item.action || 'Action not specified', 'Owner: ' + (item.owner || 'Not specified'), 'When: ' + (item.when || 'Not specified'), 'How: ' + (item.how || 'Not specified'), 'Where: ' + (item.where || 'Not specified'), 'Why: ' + (item.why || 'Not specified')];
+    return parts.join(' | ');
+  });
+  addList('OPEN QUESTIONS / RISKS', summary.openQuestions, item => item);
+  return lines.join('\n');
+}
+
+async function createSummary(transcript) {
+  const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
+  const token = localStorage.getItem('memora-summary-token') || '';
+  if (!endpoint || !token) throw new Error('Configure the AI summary service below Quick notes.');
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ transcript, language: $('speechLanguage').value })
+  });
+  if (!response.ok) throw new Error(response.status === 404 ? 'AI summary service is not connected yet.' : 'AI summary request failed.');
+  const data = await response.json();
+  if (!data || !data.summary || typeof data.summary.executiveSummary !== 'string') {
+    throw new Error('AI summary service returned an invalid response.');
+  }
+  return data.summary;
+}
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -167,6 +208,15 @@ async function startRecording() {
     return;
   }
 
+  const previousSummary = $('sessionNotes').dataset.generatedSummary || '';
+  if (previousSummary) {
+    const currentNotes = $('sessionNotes').value;
+    $('sessionNotes').value = currentNotes.endsWith(previousSummary)
+      ? currentNotes.slice(0, -previousSummary.length).trim()
+      : currentNotes;
+    $('sessionNotes').dataset.generatedSummary = '';
+  }
+
   $('recordBtn').disabled = true;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -251,11 +301,27 @@ async function finishSave() {
       currentSession.blob = audio;
       currentSession.duration = elapsedBefore;
       currentSession.transcript = transcriptText;
-      currentSession.notes = $('sessionNotes').value.trim();
+      const userNotes = $('sessionNotes').value.trim();
+      currentSession.notes = userNotes;
       currentSession.mime = audio.type;
       await saveSession(currentSession);
-      $('recordHint').textContent = 'Saved locally on this device.';
-      $('sessionNotes').value = '';
+      if (transcriptText.trim()) {
+        $('recordHint').textContent = 'Transcript saved. Preparing executive summary…';
+        try {
+          const structuredSummary = await createSummary(transcriptText.trim());
+          currentSession.summary = formatSummaryForNotes(structuredSummary);
+          $('sessionNotes').value = [userNotes, currentSession.summary].filter(Boolean).join('\n\n');
+          $('sessionNotes').dataset.generatedSummary = currentSession.summary;
+          currentSession.notes = $('sessionNotes').value.trim();
+        } catch (error) {
+          currentSession.summaryError = error.message;
+          $('recordHint').textContent = error.message + ' Transcript and audio are saved locally.';
+        }
+      } else {
+        $('recordHint').textContent = 'Audio saved. No transcript was available to summarize.';
+      }
+      await saveSession(currentSession);
+      if (currentSession.summary) $('recordHint').textContent = 'Transcript and executive summary saved in Quick notes.';
     }
   } catch (error) {
     $('recordHint').textContent = 'Could not save this session. Check device storage.';
@@ -352,7 +418,7 @@ async function renderSessions() {
       (transcriptWords ? transcriptWords + ' transcript words' : session.blob ? 'Audio recording' : 'Written note');
     content.append(title, meta);
 
-    const excerpt = MemoraSearch.excerptFor(session.transcript || '', query) || MemoraSearch.excerptFor(session.notes || '', query);
+    const excerpt = MemoraSearch.excerptFor(session.transcript || '', query) || MemoraSearch.excerptFor(session.summary || '', query) || MemoraSearch.excerptFor(session.notes || '', query);
     if (excerpt) {
       const preview = document.createElement('p');
       preview.className = 'match-preview';
@@ -360,6 +426,7 @@ async function renderSessions() {
       content.append(preview);
     }
     addTextDetails(content, 'View transcript', session.transcript || '');
+    addTextDetails(content, 'Executive summary', session.summary || '');
     addTextDetails(content, 'View notes', session.notes || '');
 
     const actions = document.createElement('div');
@@ -383,7 +450,7 @@ async function renderSessions() {
       exportButton.onclick = () => downloadFile(session.blob, 'memora-' + session.id + '.audio');
       actions.append(play, exportButton);
     }
-    const savedText = [session.transcript, session.notes].filter(text => text && text.trim()).join('\n\n');
+    const savedText = [session.summary, session.transcript, session.notes].filter(text => text && text.trim()).join('\n\n');
     if (savedText) {
       const exportText = document.createElement('button');
       exportText.textContent = 'Export text';
@@ -433,6 +500,18 @@ $('downloadTranscript').addEventListener('click', () => {
   }
   downloadFile(new Blob([transcriptText], { type: 'text/plain;charset=utf-8' }), 'memora-transcript.txt');
 });
+
+$('saveSummarySettings').addEventListener('click', () => {
+  const endpoint = $('summaryEndpoint').value.trim();
+  const token = $('summaryToken').value.trim();
+  if (endpoint) localStorage.setItem('memora-summary-endpoint', endpoint);
+  else localStorage.removeItem('memora-summary-endpoint');
+  if (token) localStorage.setItem('memora-summary-token', token);
+  else localStorage.removeItem('memora-summary-token');
+  $('summarySettingsStatus').textContent = endpoint && token ? 'AI summary service saved on this device.' : 'Add both the service URL and access token.';
+});
+$('summaryEndpoint').value = localStorage.getItem('memora-summary-endpoint') || '';
+$('summaryToken').value = localStorage.getItem('memora-summary-token') || '';
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});

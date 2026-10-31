@@ -1,4 +1,4 @@
-const CACHE = 'memora-v3';
+const CACHE = 'memora-v4';
 const FILES = ['./', './index.html', './styles.css', './search-utils.js', './app.js', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {

@@ -11,10 +11,12 @@ test('search finds words in saved transcripts and quick notes, ignoring case', (
   const session = {
     created: Date.now(),
     transcript: 'We reviewed the project plan.',
-    notes: 'Agreed to send Alex the proposal by Friday.'
+    notes: 'Agreed to send Alex the proposal by Friday.',
+    summary: 'Decision: launch the pilot in June.'
   };
   assert.equal(search.matchesSearch(session, 'proposal'), true);
   assert.equal(search.matchesSearch(session, 'PROJECT'), true);
+  assert.equal(search.matchesSearch(session, 'pilot'), true);
   assert.equal(search.matchesSearch(session, 'not mentioned'), false);
   assert.equal(search.matchesSearch(session, ''), true);
 });
