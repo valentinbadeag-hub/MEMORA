@@ -63,6 +63,10 @@ test('live transcript has Romanian, English, Hungarian translation targets', () 
   assert.match(worker, /body\.operation === 'translate'/);
   assert.match(html, /MEMORA · Build 9/);
   assert.match(app, /AI service is not configured/);
+  assert.match(worker, /@cf\/qwen\/qwen3-30b-a3b-fp8/);
+  const wrangler = JSON.parse(read('wrangler.jsonc'));
+  assert.equal(wrangler.ai.binding, 'AI');
+  assert.equal(wrangler.main, 'worker.js');
 });
 
 test('manifest icons and offline cache assets exist', () => {

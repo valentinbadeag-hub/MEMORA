@@ -30,9 +30,8 @@ Install Node.js, open PowerShell in this folder, and run node --test --test-isol
 - After Finish, MEMORA saves the transcript and audio locally, then requests a structured executive summary. The summary appears in Quick notes and is searchable with the transcript.
 - Select a saved item by tapping its date or **Open in Quick Notes** to load its summary, notes, and transcript into the Quick notes editor. If an AI summary cannot be created, MEMORA still loads the full transcript and reports why the summary is missing.
 - The summary format includes an executive summary, key discussion points, decisions, action items (owner, when, how, where, why), and open questions. Missing details are labeled **Not specified**.
-- To enable AI summaries, deploy `worker.js` as a Cloudflare Worker with `OPENAI_API_KEY` and `MEMORA_API_TOKEN` secrets. Set the Worker route to `/api/summarize`, then enter its full URL and the same access token in **Quick notes → AI summary service setup**. Create a long random token and use it for `MEMORA_API_TOKEN`; do not commit provider keys or tokens to this repository.
-- After updating the app, redeploy `worker.js` to the same Worker so transcript translation is available through the same endpoint.
-- With the current Worker configuration, the service uses OpenAI `gpt-4o-mini`. OpenAI API billing is separate from ChatGPT subscriptions.
+- AI summaries and translations run through Cloudflare Workers AI using the multilingual Qwen model; this does not require an OpenAI API key. The free Workers AI allocation is 10,000 Neurons per day; limits and billing are controlled by Cloudflare.
+- Deploy `worker.js` using the included `wrangler.jsonc`, then add a `MEMORA_API_TOKEN` secret to the Worker. Enter the deployed Worker's URL ending in `/api/summarize` and the same token in **Quick notes → AI summary service setup**. Never commit the token to this repository.
 - Search the library by words or phrases. Results include transcript text and notes.
 - Use **Export audio** or **Export .txt** to keep a copy outside browser storage.
 
@@ -48,10 +47,11 @@ Install Node.js, open PowerShell in this folder, and run node --test --test-isol
 
 ### Deploy the summary service
 
-1. Install the Cloudflare Wrangler CLI and log in to your Cloudflare account.
-2. From this folder, deploy `worker.js` as a Worker named `memora-summary`.
-3. Add secrets with `npx wrangler secret put OPENAI_API_KEY` and `npx wrangler secret put MEMORA_API_TOKEN`.
-4. Set up a route or custom domain that serves the Worker at `/api/summarize` (the app accepts the full URL).
-5. In MEMORA's AI summary service setup, enter that URL and the exact `MEMORA_API_TOKEN` value.
+1. In Cloudflare, open **Workers & Pages → Create application → Import a repository** and select `valentinbadeag-hub/MEMORA`.
+2. Deploy with the included `wrangler.jsonc`; it configures the Workers AI binding as `AI`.
+3. In the new Worker, open **Settings → Variables and Secrets → Add → Secret**. Name it `MEMORA_API_TOKEN` and enter a long random value you create.
+4. Copy the Worker's `workers.dev` URL, adding `/api/summarize` at the end.
+5. In MEMORA, open **Quick notes → AI summary service setup**. Enter that URL and the same token, then save the settings.
+6. Redeploy the Worker whenever `worker.js` changes.
 
 Record only when people are aware and you have the necessary permission.
