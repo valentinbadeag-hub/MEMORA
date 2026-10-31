@@ -848,6 +848,10 @@ $('saveSummarySettings').addEventListener('click', () => {
 });
 $('summaryEndpoint').value = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
 $('summaryToken').value = localStorage.getItem('memora-summary-token') || '';
+if (!$('summaryToken').value) {
+  $('summarySettings').open = true;
+  $('summarySettingsStatus').textContent = 'AI is not connected on this device yet. Paste your MEMORA_API_TOKEN below and save to turn on summaries and translations.';
+}
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
