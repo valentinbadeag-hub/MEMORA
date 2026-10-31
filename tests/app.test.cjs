@@ -36,6 +36,12 @@ test('page references only element IDs that exist in the HTML', () => {
   assert.deepEqual(missing, []);
 });
 
+test('speech and summary language selectors include Hungarian', () => {
+  const html = read('index.html');
+  assert.match(html, /<option value="hu-HU">Hungarian<\/option>/);
+  assert.match(html, /<option value="hu">Magyar<\/option>/);
+});
+
 test('manifest icons and offline cache assets exist', () => {
   const manifest = JSON.parse(read('manifest.webmanifest'));
   for (const icon of manifest.icons) assert.equal(fs.existsSync(path.join(root, icon.src)), true, icon.src);

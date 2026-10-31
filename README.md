@@ -23,7 +23,8 @@ Install Node.js, open PowerShell in this folder, and run node --test --test-isol
 ## Use
 
 - Tap **Start recording** and keep MEMORA in the foreground.
-- Choose Romanian or English before recording. Browser speech recognition is optional and may be unavailable.
+- Choose Romanian, English, or Hungarian before recording. Browser speech recognition is optional and may be unavailable.
+- Choose Romanian, English, or Hungarian as the summary language in Quick notes. The summary is generated in that language even when the conversation is in another language. Changing it translates the latest displayed summary; use **Translate summary to …** in the library for other saved conversations. Translations are cached locally, and you can search them.
 - Use **Quick notes** to save a decision, participant, or follow-up. During recording, a saved note is also attached to that recording.
 - After Finish, MEMORA saves the transcript and audio locally, then requests a structured executive summary. The summary appears in Quick notes and is searchable with the transcript.
 - The summary format includes an executive summary, key discussion points, decisions, action items (owner, when, how, where, why), and open questions. Missing details are labeled **Not specified**.

@@ -45,6 +45,12 @@
       <div class="section-head"><div><h2>Quick notes</h2><p class="muted">Executive summary, decisions, actions, and your own notes.</p></div></div>
       <label class="search-label" for="sessionNotes">Notes for this recording or a quick note</label>
       <textarea id="sessionNotes" class="notes-input" rows="8" placeholder="After a recording, the AI executive summary will appear here. You can also add a decision, person, or follow-up."></textarea>
+      <label class="search-label" for="notesLanguage">Summary and notes language</label>
+      <select id="notesLanguage" class="session-search">
+        <option value="ro">Română</option>
+        <option value="en">English</option>
+        <option value="hu">Magyar</option>
+      </select>
       <button id="saveNoteBtn" class="secondary save-note">Save note</button>
       <details class="summary-settings">
         <summary>AI summary service setup</summary>
@@ -70,6 +76,7 @@
         <option value="ro-RO">Romanian</option>
         <option value="en-GB">English (UK)</option>
         <option value="en-US">English (US)</option>
+        <option value="hu-HU">Hungarian</option>
       </select>
       <div id="transcript" class="transcript empty" aria-live="polite">Your recognized speech will appear here when supported. Recording works independently.</div>
       <div class="row-actions">

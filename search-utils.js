@@ -9,6 +9,7 @@
       new Date(session.created).toLocaleString(),
       session.transcript || '',
       session.summary || '',
+      Object.values(session.summaryByLanguage || {}).join(' '),
       session.notes || ''
     ].join(' ').toLocaleLowerCase();
     return content.includes(query.toLocaleLowerCase());

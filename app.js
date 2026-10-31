@@ -15,37 +15,53 @@ const DB_NAME = 'memora-local';
 const STORE = 'sessions';
 const DEFAULT_SUMMARY_ENDPOINT = '';
 
-function formatSummaryForNotes(summary) {
-  const lines = ['EXECUTIVE SUMMARY', summary.executiveSummary || 'Not specified.'];
+function formatSummaryForNotes(summary, language) {
+  const labels = {
+    ro: { exec: 'SUMAR EXECUTIV', context: 'CONTEXT', what: 'Ce', when: 'Când', how: 'Cum', where: 'Unde', why: 'De ce', points: 'PUNCTE DISCUTATE', decisions: 'DECIZII', actions: 'ACȚIUNI', open: 'ÎNTREBĂRI DESCHISE / RISCURI', none: 'Niciuna identificată', unspecified: 'Nespecificat', owner: 'Responsabil' },
+    en: { exec: 'EXECUTIVE SUMMARY', context: 'CONTEXT', what: 'What', when: 'When', how: 'How', where: 'Where', why: 'Why', points: 'KEY DISCUSSION', decisions: 'DECISIONS', actions: 'ACTIONS', open: 'OPEN QUESTIONS / RISKS', none: 'None identified', unspecified: 'Not specified', owner: 'Owner' },
+    hu: { exec: 'VEZETŐI ÖSSZEFOGLALÓ', context: 'KONTEXTUS', what: 'Mi', when: 'Mikor', how: 'Hogyan', where: 'Hol', why: 'Miért', points: 'FŐBB TÉMÁK', decisions: 'DÖNTÉSEK', actions: 'TEENDŐK', open: 'NYITOTT KÉRDÉSEK / KOCKÁZATOK', none: 'Nem merült fel', unspecified: 'Nincs megadva', owner: 'Felelős' }
+  }[language] || null;
+  const text = labels || { exec: 'EXECUTIVE SUMMARY', context: 'CONTEXT', what: 'What', when: 'When', how: 'How', where: 'Where', why: 'Why', points: 'KEY DISCUSSION', decisions: 'DECISIONS', actions: 'ACTIONS', open: 'OPEN QUESTIONS / RISKS', none: 'None identified', unspecified: 'Not specified', owner: 'Owner' };
+  const lines = [text.exec, summary.executiveSummary || text.unspecified + '.'];
   if (summary.context) {
-    lines.push('', 'CONTEXT');
-    for (const [label, key] of [['What', 'what'], ['When', 'when'], ['How', 'how'], ['Where', 'where'], ['Why', 'why']]) {
-      lines.push(label + ': ' + (summary.context[key] || 'Not specified'));
+    lines.push('', text.context);
+    for (const key of ['what', 'when', 'how', 'where', 'why']) {
+      lines.push(text[key] + ': ' + (summary.context[key] || text.unspecified));
     }
   }
   const addList = (heading, items, format) => {
     lines.push('', heading);
-    if (!items || !items.length) lines.push('• None identified.');
+    if (!items || !items.length) lines.push('• ' + text.none);
     else items.forEach(item => lines.push('• ' + format(item)));
   };
-  addList('KEY DISCUSSION', summary.keyPoints, item => item);
-  addList('DECISIONS', summary.decisions, item => item);
-  addList('ACTIONS', summary.actions, item => {
-    const parts = [item.action || 'Action not specified', 'Owner: ' + (item.owner || 'Not specified'), 'When: ' + (item.when || 'Not specified'), 'How: ' + (item.how || 'Not specified'), 'Where: ' + (item.where || 'Not specified'), 'Why: ' + (item.why || 'Not specified')];
+  addList(text.points, summary.keyPoints, item => item);
+  addList(text.decisions, summary.decisions, item => item);
+  addList(text.actions, summary.actions, item => {
+    const parts = [item.action || text.unspecified, text.owner + ': ' + (item.owner || text.unspecified), text.when + ': ' + (item.when || text.unspecified), text.how + ': ' + (item.how || text.unspecified), text.where + ': ' + (item.where || text.unspecified), text.why + ': ' + (item.why || text.unspecified)];
     return parts.join(' | ');
   });
-  addList('OPEN QUESTIONS / RISKS', summary.openQuestions, item => item);
+  addList(text.open, summary.openQuestions, item => item);
   return lines.join('\n');
 }
 
-async function createSummary(transcript) {
+function speechLanguageName(language) {
+  if (language === 'ro-RO') return 'Romanian';
+  if (language === 'hu-HU') return 'Hungarian';
+  return 'English';
+}
+
+function summaryLanguageName(language) {
+  return ({ ro: 'Romanian', en: 'English', hu: 'Hungarian' })[language] || 'Romanian';
+}
+
+async function createSummary(transcript, sourceLanguage, targetLanguage) {
   const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
   const token = localStorage.getItem('memora-summary-token') || '';
   if (!endpoint || !token) throw new Error('Configure the AI summary service below Quick notes.');
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ transcript, language: $('speechLanguage').value })
+    body: JSON.stringify({ transcript, language: sourceLanguage, outputLanguage: targetLanguage })
   });
   if (!response.ok) throw new Error(response.status === 404 ? 'AI summary service is not connected yet.' : 'AI summary request failed.');
   const data = await response.json();
@@ -53,6 +69,30 @@ async function createSummary(transcript) {
     throw new Error('AI summary service returned an invalid response.');
   }
   return data.summary;
+}
+
+function summaryForLanguage(session, language) {
+  if (session.summaryByLanguage && session.summaryByLanguage[language]) return session.summaryByLanguage[language];
+  if (session.summary && session.summaryLanguage === language) return session.summary;
+  return '';
+}
+
+async function translateSessionSummary(session, targetLanguage) {
+  if (!session.transcript) throw new Error('This note has no transcript to translate.');
+  session.summaryByLanguage = session.summaryByLanguage || {};
+  const structuredSummary = await createSummary(session.transcript, session.speechLanguage || 'auto', targetLanguage);
+  const formatted = formatSummaryForNotes(structuredSummary);
+  session.summaryByLanguage[targetLanguage] = formatted;
+  session.summary = formatted;
+  session.summaryLanguage = targetLanguage;
+  await saveSession(session);
+  const notes = $('sessionNotes');
+  if (notes.dataset.sessionId === session.id) {
+    const manual = session.sourceNotes || '';
+    notes.value = [manual, formatted].filter(Boolean).join('\n\n');
+    notes.dataset.generatedSummary = formatted;
+  }
+  return formatted;
 }
 
 function openDB() {
@@ -241,6 +281,7 @@ async function startRecording() {
       duration: 0,
       transcript: '',
       notes: '',
+      speechLanguage: $('speechLanguage').value,
       blob: null,
       mime: recorder.mimeType || 'audio/mp4'
     };
@@ -302,16 +343,21 @@ async function finishSave() {
       currentSession.duration = elapsedBefore;
       currentSession.transcript = transcriptText;
       const userNotes = $('sessionNotes').value.trim();
+      currentSession.sourceNotes = userNotes;
       currentSession.notes = userNotes;
       currentSession.mime = audio.type;
       await saveSession(currentSession);
       if (transcriptText.trim()) {
         $('recordHint').textContent = 'Transcript saved. Preparing executive summary…';
         try {
-          const structuredSummary = await createSummary(transcriptText.trim());
-          currentSession.summary = formatSummaryForNotes(structuredSummary);
+          const targetLanguage = $('notesLanguage').value;
+          const structuredSummary = await createSummary(transcriptText.trim(), currentSession.speechLanguage, targetLanguage);
+          currentSession.summary = formatSummaryForNotes(structuredSummary, targetLanguage);
+          currentSession.summaryLanguage = targetLanguage;
+          currentSession.summaryByLanguage = { ...(currentSession.summaryByLanguage || {}), [targetLanguage]: currentSession.summary };
           $('sessionNotes').value = [userNotes, currentSession.summary].filter(Boolean).join('\n\n');
           $('sessionNotes').dataset.generatedSummary = currentSession.summary;
+          $('sessionNotes').dataset.sessionId = currentSession.id;
           currentSession.notes = $('sessionNotes').value.trim();
         } catch (error) {
           currentSession.summaryError = error.message;
@@ -389,6 +435,16 @@ async function renderSessions() {
   const query = $('searchSessions').value.trim();
   const matches = list.filter(session => MemoraSearch.matchesSearch(session, query));
   $('sessionCount').textContent = String(list.length);
+  const latestWithSummary = list.find(session => session.transcript && (session.summary || Object.keys(session.summaryByLanguage || {}).length));
+  if (!$('sessionNotes').value.trim() && latestWithSummary && !recorder) {
+    const language = $('notesLanguage').value;
+    const latestSummary = summaryForLanguage(latestWithSummary, language) || latestWithSummary.summary;
+    if (latestSummary) {
+      $('sessionNotes').value = [latestWithSummary.sourceNotes || '', latestSummary].filter(Boolean).join('\n\n');
+      $('sessionNotes').dataset.generatedSummary = latestSummary;
+      $('sessionNotes').dataset.sessionId = latestWithSummary.id;
+    }
+  }
   const container = $('sessions');
   container.replaceChildren();
 
@@ -418,7 +474,8 @@ async function renderSessions() {
       (transcriptWords ? transcriptWords + ' transcript words' : session.blob ? 'Audio recording' : 'Written note');
     content.append(title, meta);
 
-    const excerpt = MemoraSearch.excerptFor(session.transcript || '', query) || MemoraSearch.excerptFor(session.summary || '', query) || MemoraSearch.excerptFor(session.notes || '', query);
+    const activeSummary = summaryForLanguage(session, $('notesLanguage').value) || session.summary || '';
+    const excerpt = MemoraSearch.excerptFor(session.transcript || '', query) || MemoraSearch.excerptFor(activeSummary, query) || MemoraSearch.excerptFor(session.notes || '', query);
     if (excerpt) {
       const preview = document.createElement('p');
       preview.className = 'match-preview';
@@ -426,11 +483,28 @@ async function renderSessions() {
       content.append(preview);
     }
     addTextDetails(content, 'View transcript', session.transcript || '');
-    addTextDetails(content, 'Executive summary', session.summary || '');
+    addTextDetails(content, 'Executive summary (' + summaryLanguageName(session.summaryLanguage || 'en') + ')', activeSummary);
     addTextDetails(content, 'View notes', session.notes || '');
 
     const actions = document.createElement('div');
     actions.className = 'session-actions';
+    if (session.transcript && !summaryForLanguage(session, $('notesLanguage').value)) {
+      const translate = document.createElement('button');
+      translate.textContent = 'Translate summary to ' + summaryLanguageName($('notesLanguage').value);
+      translate.onclick = async () => {
+        translate.disabled = true;
+        translate.textContent = 'Translating…';
+        try {
+          await translateSessionSummary(session, $('notesLanguage').value);
+          await renderSessions();
+        } catch (error) {
+          $('recordHint').textContent = error.message;
+          translate.disabled = false;
+          translate.textContent = 'Retry translation';
+        }
+      };
+      actions.append(translate);
+    }
     if (session.blob) {
       const play = document.createElement('button');
       play.textContent = 'Play';
@@ -450,7 +524,8 @@ async function renderSessions() {
       exportButton.onclick = () => downloadFile(session.blob, 'memora-' + session.id + '.audio');
       actions.append(play, exportButton);
     }
-    const savedText = [session.summary, session.transcript, session.notes].filter(text => text && text.trim()).join('\n\n');
+    const translatedSummaries = Object.values(session.summaryByLanguage || {});
+    const savedText = [...translatedSummaries, session.summary, session.transcript, session.notes].filter((text, index, values) => text && text.trim() && values.indexOf(text) === index).join('\n\n');
     if (savedText) {
       const exportText = document.createElement('button');
       exportText.textContent = 'Export text';
@@ -480,6 +555,32 @@ $('pauseBtn').addEventListener('click', pauseRecording);
 $('stopBtn').addEventListener('click', stopRecording);
 $('saveNoteBtn').addEventListener('click', saveQuickNote);
 $('searchSessions').addEventListener('input', () => renderSessions().catch(() => {}));
+$('notesLanguage').value = localStorage.getItem('memora-notes-language') || 'ro';
+$('notesLanguage').addEventListener('change', async () => {
+  const language = $('notesLanguage').value;
+  localStorage.setItem('memora-notes-language', language);
+  const noteInput = $('sessionNotes');
+  const sessionId = noteInput.dataset.sessionId;
+  if (sessionId) {
+    try {
+      const saved = (await allSessions()).find(session => session.id === sessionId);
+      if (saved && !summaryForLanguage(saved, language) && saved.transcript) {
+        $('recordHint').textContent = 'Translating the summary to ' + summaryLanguageName(language) + '…';
+        await translateSessionSummary(saved, language);
+        $('recordHint').textContent = 'Notes translated and saved on this device.';
+      } else if (saved) {
+        const text = summaryForLanguage(saved, language);
+        if (text) {
+          noteInput.value = [saved.sourceNotes || '', text].filter(Boolean).join('\n\n');
+          noteInput.dataset.generatedSummary = text;
+        }
+      }
+    } catch (error) {
+      $('recordHint').textContent = error.message;
+    }
+  }
+  renderSessions().catch(() => {});
+});
 $('copyTranscript').addEventListener('click', async () => {
   if (!transcriptText) {
     alert('There is no transcript to copy yet.');
