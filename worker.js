@@ -4,6 +4,7 @@ const ALLOWED_ORIGINS = new Set([
   'http://127.0.0.1:8787'
 ]);
 const MODEL = '@cf/qwen/qwen3-30b-a3b-fp8';
+const MAX_REQUESTS_PER_MINUTE = 20;
 
 async function runModel(env, messages, maxTokens, temperature) {
   const result = await env.AI.run(MODEL, { messages, max_tokens: maxTokens, temperature });
@@ -33,15 +34,17 @@ export default {
     const pathname = new URL(request.url).pathname;
     if (pathname === '/api/health') {
       if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, origin);
-      if (!env.AI || !env.MEMORA_API_TOKEN) return json({ error: 'Summary service is not configured.' }, 503, origin);
-      if (request.headers.get('Authorization') !== 'Bearer ' + env.MEMORA_API_TOKEN) return json({ error: 'Unauthorized' }, 401, origin);
+      if (!env.AI) return json({ error: 'Summary service is not configured.' }, 503, origin);
       return json({ ok: true, aiConfigured: true }, 200, origin);
     }
     if (request.method !== 'POST' || pathname !== '/api/summarize') {
       return json({ error: 'Not found' }, 404, origin);
     }
-    if (!env.AI || !env.MEMORA_API_TOKEN) return json({ error: 'Summary service is not configured.' }, 503, origin);
-    if (request.headers.get('Authorization') !== 'Bearer ' + env.MEMORA_API_TOKEN) return json({ error: 'Unauthorized' }, 401, origin);
+    if (!ALLOWED_ORIGINS.has(origin)) return json({ error: 'Requests must come from the MEMORA app.' }, 403, origin);
+    if (!env.AI || !env.MEMORA_LIMITER) return json({ error: 'Summary service is not configured.' }, 503, origin);
+    const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const rateLimit = await env.MEMORA_LIMITER.limit({ key: clientIp });
+    if (!rateLimit.success) return json({ error: `AI request limit reached (${MAX_REQUESTS_PER_MINUTE} per minute per IP). Please try again shortly.` }, 429, origin);
 
     let body;
     try { body = await request.json(); } catch (error) { return json({ error: 'Invalid JSON request.' }, 400, origin); }
@@ -77,3 +80,4 @@ export default {
     }
   }
 };
+
