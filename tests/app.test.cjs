@@ -42,6 +42,15 @@ test('speech and summary language selectors include Hungarian', () => {
   assert.match(html, /<option value="hu">Magyar<\/option>/);
 });
 
+test('saved sessions can be loaded into Quick Notes with transcript fallback', () => {
+  const html = read('index.html');
+  const app = read('app.js');
+  assert.match(html, /id="quickNotesStatus"/);
+  assert.match(app, /Open in Quick Notes/);
+  assert.match(app, /selectSessionForQuickNotes\(session\)/);
+  assert.match(app, /TRANSCRIPT\\n' \+ session\.transcript/);
+});
+
 test('manifest icons and offline cache assets exist', () => {
   const manifest = JSON.parse(read('manifest.webmanifest'));
   for (const icon of manifest.icons) assert.equal(fs.existsSync(path.join(root, icon.src)), true, icon.src);

@@ -10,6 +10,7 @@ let recognition = null;
 let speechWanted = false;
 let transcriptText = '';
 let currentSession = null;
+let selectedSessionId = null;
 
 const DB_NAME = 'memora-local';
 const STORE = 'sessions';
@@ -100,6 +101,53 @@ async function translateSessionSummary(session, targetLanguage) {
     notes.dataset.generatedSummary = formatted;
   }
   return formatted;
+}
+
+function notesWithoutGeneratedSummary(text, summary) {
+  if (!summary || !text || !text.endsWith(summary)) return text || '';
+  return text.slice(0, -summary.length).trim();
+}
+
+async function selectSessionForQuickNotes(session) {
+  selectedSessionId = session.id;
+  const notes = $('sessionNotes');
+  notes.dataset.sessionId = session.id;
+  const language = $('notesLanguage').value;
+  const sourceNotes = session.sourceNotes || (session.summary ? notesWithoutGeneratedSummary(session.notes, session.summary) : session.notes || '');
+  let summary = summaryForLanguage(session, language);
+
+  $('quickNotesStatus').textContent = 'Loading the selected note…';
+  $('quickNotesCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (!summary && session.transcript) {
+    $('quickNotesStatus').textContent = 'Preparing an executive summary from this transcript…';
+    try {
+      summary = await translateSessionSummary(session, language);
+      $('quickNotesStatus').textContent = 'Summary generated and saved. You can edit these notes.';
+      await renderSessions();
+    } catch (error) {
+      summary = '';
+      $('quickNotesStatus').textContent = error.message + ' The transcript is shown below so you can still review it.';
+    }
+  }
+
+  if (summary) {
+    notes.value = [sourceNotes, summary].filter(Boolean).join('\n\n');
+    notes.dataset.generatedSummary = summary;
+    notes.dataset.sessionId = session.id;
+    $('quickNotesStatus').textContent = 'Selected note loaded. Executive summary and details are shown below.';
+  } else if (sourceNotes || session.transcript) {
+    const transcriptBlock = session.transcript ? '\n\nTRANSCRIPT\n' + session.transcript : '';
+    notes.value = [sourceNotes, transcriptBlock].filter(Boolean).join('\n\n').trim();
+    notes.dataset.generatedSummary = '';
+    notes.dataset.sessionId = session.id;
+    if (!session.transcript) $('quickNotesStatus').textContent = 'Saved note loaded in Quick Notes.';
+  } else {
+    notes.value = 'Nu există încă un transcript sau un sumar pentru această înregistrare.';
+    notes.dataset.generatedSummary = '';
+    notes.dataset.sessionId = session.id;
+    $('quickNotesStatus').textContent = 'This recording has no saved transcript or summary.';
+  }
+  renderSessions().catch(() => {});
 }
 
 function openDB() {
@@ -263,6 +311,8 @@ async function startRecording() {
       : currentNotes;
     $('sessionNotes').dataset.generatedSummary = '';
   }
+  selectedSessionId = null;
+  $('sessionNotes').dataset.sessionId = '';
 
   $('recordBtn').disabled = true;
   try {
@@ -354,6 +404,8 @@ async function finishSave() {
       currentSession.notes = userNotes;
       currentSession.mime = audio.type;
       await saveSession(currentSession);
+      selectedSessionId = currentSession.id;
+      $('sessionNotes').dataset.sessionId = currentSession.id;
       if (transcriptText.trim()) {
         $('recordHint').textContent = 'Transcript saved. Preparing executive summary…';
         try {
@@ -364,13 +416,20 @@ async function finishSave() {
           currentSession.summaryByLanguage = { ...(currentSession.summaryByLanguage || {}), [targetLanguage]: currentSession.summary };
           $('sessionNotes').value = [userNotes, currentSession.summary].filter(Boolean).join('\n\n');
           $('sessionNotes').dataset.generatedSummary = currentSession.summary;
-          $('sessionNotes').dataset.sessionId = currentSession.id;
           currentSession.notes = $('sessionNotes').value.trim();
+          $('quickNotesStatus').textContent = 'Executive summary and action details are ready in Quick Notes.';
         } catch (error) {
           currentSession.summaryError = error.message;
+          $('sessionNotes').value = [userNotes, 'SUMAR EXECUTIV\nSumarul AI nu a putut fi generat. Transcriptul complet este inclus mai jos.', 'TRANSCRIPT\n' + transcriptText.trim()].filter(Boolean).join('\n\n');
+          $('sessionNotes').dataset.generatedSummary = '';
+          currentSession.notes = $('sessionNotes').value.trim();
+          $('quickNotesStatus').textContent = 'Transcript salvat. ' + error.message;
           $('recordHint').textContent = error.message + ' Transcript and audio are saved locally.';
         }
       } else {
+        $('sessionNotes').value = [userNotes, 'Nu există un transcript disponibil pentru sumarizare. Înregistrarea audio a fost salvată.'].filter(Boolean).join('\n\n');
+        $('sessionNotes').dataset.generatedSummary = '';
+        $('quickNotesStatus').textContent = 'Înregistrarea audio este salvată, dar browserul nu a furnizat un transcript.';
         $('recordHint').textContent = 'Audio saved. No transcript was available to summarize.';
       }
       await saveSession(currentSession);
@@ -397,6 +456,19 @@ async function saveQuickNote() {
     return;
   }
   try {
+    const sessionId = $('sessionNotes').dataset.sessionId;
+    if (sessionId && !recorder) {
+      const selected = (await allSessions()).find(session => session.id === sessionId);
+      if (selected) {
+        const summary = $('sessionNotes').dataset.generatedSummary || '';
+        selected.sourceNotes = notesWithoutGeneratedSummary(notes, summary);
+        selected.notes = notes;
+        await saveSession(selected);
+        $('quickNotesStatus').textContent = 'Changes saved to the selected note.';
+        await renderSessions();
+        return;
+      }
+    }
     await saveSession({
       id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2)),
       created: Date.now(),
@@ -466,12 +538,15 @@ async function renderSessions() {
 
   for (const session of matches) {
     const item = document.createElement('article');
-    item.className = 'session';
+    item.className = 'session' + (session.id === selectedSessionId ? ' selected' : '');
     const content = document.createElement('div');
     content.className = 'session-content';
-    const title = document.createElement('div');
-    title.className = 'session-title';
+    const title = document.createElement('button');
+    title.className = 'session-title session-select';
+    title.type = 'button';
     title.textContent = new Date(session.created).toLocaleString();
+    title.setAttribute('aria-label', 'Open this saved recording or note in Quick notes');
+    title.onclick = () => selectSessionForQuickNotes(session);
     const transcriptWords = session.transcript && session.transcript.trim()
       ? session.transcript.trim().split(/\s+/).length
       : 0;
@@ -495,6 +570,10 @@ async function renderSessions() {
 
     const actions = document.createElement('div');
     actions.className = 'session-actions';
+    const openNotes = document.createElement('button');
+    openNotes.textContent = 'Open in Quick Notes';
+    openNotes.onclick = () => selectSessionForQuickNotes(session);
+    actions.append(openNotes);
     if (session.transcript && !summaryForLanguage(session, $('notesLanguage').value)) {
       const translate = document.createElement('button');
       translate.textContent = 'Translate summary to ' + summaryLanguageName($('notesLanguage').value);
@@ -627,4 +706,3 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 renderSessions().catch(() => {
   $('sessions').innerHTML = '<div class="empty">Storage is unavailable in this browser.</div>';
 });
-

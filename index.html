@@ -41,10 +41,11 @@
       <article class="card stat"><span class="muted">Live transcript words</span><strong id="wordCount">0</strong></article>
     </section>
 
-    <section class="card">
+    <section id="quickNotesCard" class="card">
       <div class="section-head"><div><h2>Quick notes</h2><p class="muted">Executive summary, decisions, actions, and your own notes.</p></div></div>
       <label class="search-label" for="sessionNotes">Notes for this recording or a quick note</label>
       <textarea id="sessionNotes" class="notes-input" rows="8" placeholder="After a recording, the AI executive summary will appear here. You can also add a decision, person, or follow-up."></textarea>
+      <p id="quickNotesStatus" class="privacy-note" aria-live="polite">Select a saved recording or note to load it here.</p>
       <label class="search-label" for="notesLanguage">Summary and notes language</label>
       <select id="notesLanguage" class="session-search">
         <option value="ro">Română</option>

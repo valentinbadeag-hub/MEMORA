@@ -48,8 +48,10 @@ button:disabled{opacity:.35;cursor:not-allowed}
 .summary-settings .session-search{margin-bottom:5px}
 .sessions{margin-top:14px}
 .session{padding:14px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.session.selected{background:#1b2942;border-radius:10px;padding-left:10px;padding-right:10px}
 .session-content{min-width:0;flex:1}
 .session-title{font-weight:650;font-size:14px}
+.session-select{display:block;padding:2px 0;min-height:auto;margin:0;background:none;color:var(--text);text-align:left;border-radius:4px}
 .session-meta{font-size:11px;color:var(--muted);margin-top:4px}
 .session-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
 .session-actions button{padding:8px 10px;font-size:11px;background:#26334c;color:var(--text);min-height:36px}
