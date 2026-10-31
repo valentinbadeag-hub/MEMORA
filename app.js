@@ -14,7 +14,7 @@ let selectedSessionId = null;
 
 const DB_NAME = 'memora-local';
 const STORE = 'sessions';
-const DEFAULT_SUMMARY_ENDPOINT = '';
+const DEFAULT_SUMMARY_ENDPOINT = 'https://memora-summary.valentin-badeag.workers.dev/api/summarize';
 
 function showSummarySetup(message) {
   $('summarySettings').open = true;
@@ -64,7 +64,7 @@ async function createSummary(transcript, sourceLanguage, targetLanguage) {
   const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
   const token = localStorage.getItem('memora-summary-token') || '';
   if (!endpoint || !token) {
-    showSummarySetup('AI summaries and translations need a service URL and access token. Configure both here.');
+    showSummarySetup('The MEMORA service URL is ready. Add the access token on this device to enable AI summaries and translations.');
     throw new Error('AI service is not configured.');
   }
   const controller = new AbortController();
@@ -83,11 +83,12 @@ async function createSummary(transcript, sourceLanguage, targetLanguage) {
   } finally {
     clearTimeout(timeout);
   }
+  const data = await response.json();
   if (!response.ok) {
     if (response.status === 404) showSummarySetup('The configured AI service URL was not found. Check that it ends with /api/summarize.');
-    throw new Error(response.status === 404 ? 'AI summary service is not connected yet.' : 'AI summary request failed.');
+    if (response.status === 401) showSummarySetup('The access token was rejected. Re-enter the MEMORA_API_TOKEN for this device.');
+    throw new Error(data.error || (response.status === 404 ? 'AI summary service is not connected yet.' : `AI summary request failed (HTTP ${response.status}).`));
   }
-  const data = await response.json();
   if (!data || !data.summary || typeof data.summary.executiveSummary !== 'string') {
     throw new Error('AI summary service returned an invalid response.');
   }
@@ -130,7 +131,7 @@ async function translateCurrentTranscript() {
     const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
     const token = localStorage.getItem('memora-summary-token') || '';
     if (!endpoint || !token) {
-      showSummarySetup('AI transcript translation needs a service URL and access token. Configure both here.');
+      showSummarySetup('The MEMORA service URL is ready. Add the access token on this device to enable AI summaries and translations.');
       throw new Error('AI service is not configured.');
     }
     const response = await fetch(endpoint, {
@@ -141,6 +142,7 @@ async function translateCurrentTranscript() {
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
       if (response.status === 404) showSummarySetup('The configured AI service URL was not found. Check that it ends with /api/summarize.');
+      if (response.status === 401) showSummarySetup('The access token was rejected. Re-enter the MEMORA_API_TOKEN for this device.');
       throw new Error(result.error || 'Translation service request failed.');
     }
     if (!result.translation || typeof result.translation !== 'string') throw new Error('Translation service returned no translated text.');
@@ -820,15 +822,16 @@ $('downloadTranscript').addEventListener('click', () => {
 });
 
 $('saveSummarySettings').addEventListener('click', () => {
-  const endpoint = $('summaryEndpoint').value.trim();
+  const endpoint = $('summaryEndpoint').value.trim() || DEFAULT_SUMMARY_ENDPOINT;
   const token = $('summaryToken').value.trim();
-  if (endpoint) localStorage.setItem('memora-summary-endpoint', endpoint);
-  else localStorage.removeItem('memora-summary-endpoint');
+  localStorage.setItem('memora-summary-endpoint', endpoint);
   if (token) localStorage.setItem('memora-summary-token', token);
   else localStorage.removeItem('memora-summary-token');
-  $('summarySettingsStatus').textContent = endpoint && token ? 'AI summary service saved on this device.' : 'Add both the service URL and access token.';
+  $('summarySettingsStatus').textContent = token
+    ? 'AI summary service saved on this device.'
+    : 'Service URL saved. Add the access token to enable summaries on this device.';
 });
-$('summaryEndpoint').value = localStorage.getItem('memora-summary-endpoint') || '';
+$('summaryEndpoint').value = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
 $('summaryToken').value = localStorage.getItem('memora-summary-token') || '';
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -845,3 +848,4 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 renderSessions().catch(() => {
   $('sessions').innerHTML = '<div class="empty">Storage is unavailable in this browser.</div>';
 });
+
