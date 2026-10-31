@@ -6,5 +6,16 @@
   "workers_dev": true,
   "ai": {
     "binding": "AI"
-  }
+  },
+  "ratelimits": [
+    {
+      "name": "MEMORA_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 20,
+        "period": 60
+      }
+    }
+  ]
 }
+
