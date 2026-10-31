@@ -61,38 +61,42 @@ test('live transcript has Romanian, English, Hungarian translation targets', () 
   assert.match(html, /id="transcriptLanguage"[\s\S]*value="ro"[\s\S]*value="en"[\s\S]*value="hu"/);
   assert.match(app, /operation: 'translate'/);
   assert.match(worker, /body\.operation === 'translate'/);
-  assert.match(html, /MEMORA · Build 11/);
-  assert.match(app, /AI service is not configured/);
+  assert.match(html, /MEMORA · Build 12/);
+  assert.match(app, /DEFAULT_SUMMARY_ENDPOINT/);
   assert.match(worker, /@cf\/qwen\/qwen3-30b-a3b-fp8/);
   const wrangler = JSON.parse(read('wrangler.jsonc'));
   assert.equal(wrangler.ai.binding, 'AI');
   assert.equal(wrangler.main, 'worker.js');
 });
 
-test('the Cloudflare summary endpoint is prefilled and token failures are actionable', () => {
+test('the Cloudflare summary endpoint is fixed and requires no per-device secret', () => {
   const app = read('app.js');
+  const html = read('index.html');
   assert.match(app, /DEFAULT_SUMMARY_ENDPOINT = 'https:\/\/memora-summary\.valentin-badeag\.workers\.dev\/api\/summarize'/);
-  assert.match(app, /summaryEndpoint'\)\.value = localStorage\.getItem\('memora-summary-endpoint'\) \|\| DEFAULT_SUMMARY_ENDPOINT/);
-  assert.match(app, /access token was rejected/);
+  assert.doesNotMatch(app, /memora-summary-token|Authorization: 'Bearer/);
+  assert.doesNotMatch(html, /id="summaryToken"|id="saveSummarySettings"/);
 });
 
-test('saving AI settings checks the authenticated Worker health endpoint', () => {
+test('the shared Worker health endpoint is unauthenticated and the POST API is rate limited', () => {
   const app = read('app.js');
   const worker = read('worker.js');
-  assert.match(app, /const healthUrl = endpoint\.replace\(\/\\\/api\\\/summarize/);
-  assert.match(app, /Checking the service and token/);
-  assert.match(app, /Token rejected/);
-  assert.match(app, /AI is not connected on this device yet/);
+  assert.match(app, /shared AI service is ready on this device/i);
+  assert.match(app, /response\.status === 429/);
   assert.match(worker, /pathname === '\/api\/health'/);
   assert.match(worker, /aiConfigured: true/);
-  assert.match(worker, /Access-Control-Allow-Methods': 'GET, POST, OPTIONS'/);
+  assert.match(worker, /MEMORA_LIMITER\.limit\(\{ key: clientIp \}\)/);
+  assert.match(worker, /Requests must come from the MEMORA app/);
+  const wrangler = JSON.parse(read('wrangler.jsonc'));
+  assert.equal(wrangler.ratelimits[0].name, 'MEMORA_LIMITER');
+  assert.equal(wrangler.ratelimits[0].simple.limit, 20);
+  assert.equal(wrangler.ratelimits[0].simple.period, 60);
 });
 
 test('manifest icons and offline cache assets exist', () => {
   const manifest = JSON.parse(read('manifest.webmanifest'));
   for (const icon of manifest.icons) assert.equal(fs.existsSync(path.join(root, icon.src)), true, icon.src);
   const sw = read('sw.js');
-  assert.match(sw, /memora-v12/);
+  assert.match(sw, /memora-v13/);
   const assets = Array.from(sw.matchAll(/["']\.\/([^"']+)["']/g), match => match[1]).filter(Boolean);
   for (const asset of assets) assert.equal(fs.existsSync(path.join(root, asset)), true, asset);
 });
@@ -105,3 +109,4 @@ test('all home-screen icon PNGs have the declared dimensions', () => {
     assert.equal(png.readUInt32BE(20), size);
   }
 });
+
