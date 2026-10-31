@@ -827,9 +827,24 @@ $('saveSummarySettings').addEventListener('click', () => {
   localStorage.setItem('memora-summary-endpoint', endpoint);
   if (token) localStorage.setItem('memora-summary-token', token);
   else localStorage.removeItem('memora-summary-token');
-  $('summarySettingsStatus').textContent = token
-    ? 'AI summary service saved on this device.'
-    : 'Service URL saved. Add the access token to enable summaries on this device.';
+  if (!token) {
+    $('summarySettingsStatus').textContent = 'Service URL saved. Add the access token to enable summaries on this device.';
+    return;
+  }
+  $('summarySettingsStatus').textContent = 'Checking the service and token…';
+  const healthUrl = endpoint.replace(/\/api\/summarize\/?$/, '/api/health');
+  fetch(healthUrl, { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' })
+    .then(async response => {
+      const result = await response.json().catch(() => ({}));
+      if (response.status === 401) throw new Error('Token rejected. Check that you entered the current MEMORA_API_TOKEN.');
+      if (!response.ok) throw new Error(result.error || `Service check failed (HTTP ${response.status}).`);
+      $('summarySettingsStatus').textContent = 'Connected. The AI service and token are ready on this device.';
+    })
+    .catch(error => {
+      $('summarySettingsStatus').textContent = error.message.includes('Failed to fetch')
+        ? 'Could not reach the service. Check the URL and internet connection.'
+        : error.message;
+    });
 });
 $('summaryEndpoint').value = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
 $('summaryToken').value = localStorage.getItem('memora-summary-token') || '';
@@ -848,4 +863,3 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 renderSessions().catch(() => {
   $('sessions').innerHTML = '<div class="empty">Storage is unavailable in this browser.</div>';
 });
-
