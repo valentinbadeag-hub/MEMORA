@@ -54,14 +54,9 @@
       </select>
       <button id="saveNoteBtn" class="secondary save-note">Save note</button>
       <details id="summarySettings" class="summary-settings">
-        <summary>AI summary service setup</summary>
-        <p class="privacy-note">The service URL is filled in automatically. Paste your access token on each device, then save to check that the AI service can be reached. Transcripts are sent to the service; recordings remain on this device.</p>
-        <label class="search-label" for="summaryEndpoint">Summary service URL</label>
-        <input id="summaryEndpoint" class="session-search" type="url" placeholder="https://your-service.example.com/api/summarize" autocomplete="url">
-        <label class="search-label" for="summaryToken">Access token</label>
-        <input id="summaryToken" class="session-search" type="password" autocomplete="off">
-        <button id="saveSummarySettings" class="secondary save-note">Save AI settings</button>
-        <p id="summarySettingsStatus" class="privacy-note" aria-live="polite"></p>
+        <summary>AI summary service</summary>
+        <p class="privacy-note">Shared service for your devices. No setup token is needed. Transcripts are sent to Cloudflare Workers AI for summaries and translations; recordings and notes remain on this device.</p>
+        <p id="summarySettingsStatus" class="privacy-note" aria-live="polite">Checking shared AI service…</p>
       </details>
       <p class="privacy-note">Notes, recordings, and transcripts are stored in this browser on this device.</p>
     </section>
@@ -71,7 +66,7 @@
         <div><h2>Live transcript</h2><p class="muted">Optional browser speech recognition; it may not be available in iPhone Safari.</p></div>
         <span class="live-label" id="speechLabel">Standby</span>
       </div>
-      <p class="privacy-note">AI summaries use the transcript and require a configured secure summary service. Audio stays on this device.</p>
+      <p class="privacy-note">AI summaries use the transcript through the shared MEMORA service. Audio stays on this device.</p>
       <label class="search-label" for="speechLanguage">Speech language</label>
       <select id="speechLanguage" class="session-search">
         <option value="ro-RO">Romanian</option>
@@ -104,9 +99,10 @@
       <div id="sessions" class="sessions"><div class="empty">Loading your saved items…</div></div>
     </section>
 
-    <footer>MEMORA · Build 11 · Local storage · No account required</footer>
+    <footer>MEMORA · Build 12 · Local storage · No account required</footer>
   </main>
   <script src="search-utils.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
+
