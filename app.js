@@ -17,7 +17,6 @@ const STORE = 'sessions';
 const DEFAULT_SUMMARY_ENDPOINT = 'https://memora-summary.valentin-badeag.workers.dev/api/summarize';
 
 function showSummarySetup(message) {
-  $('summarySettings').open = true;
   $('summarySettingsStatus').textContent = message;
 }
 
@@ -61,19 +60,14 @@ function summaryLanguageName(language) {
 }
 
 async function createSummary(transcript, sourceLanguage, targetLanguage) {
-  const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
-  const token = localStorage.getItem('memora-summary-token') || '';
-  if (!endpoint || !token) {
-    showSummarySetup('The MEMORA service URL is ready. Add the access token on this device to enable AI summaries and translations.');
-    throw new Error('AI service is not configured.');
-  }
+  const endpoint = DEFAULT_SUMMARY_ENDPOINT;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45000);
   let response;
   try {
     response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transcript, language: sourceLanguage, outputLanguage: targetLanguage }),
       signal: controller.signal
     });
@@ -86,7 +80,7 @@ async function createSummary(transcript, sourceLanguage, targetLanguage) {
   const data = await response.json();
   if (!response.ok) {
     if (response.status === 404) showSummarySetup('The configured AI service URL was not found. Check that it ends with /api/summarize.');
-    if (response.status === 401) showSummarySetup('The access token was rejected. Re-enter the MEMORA_API_TOKEN for this device.');
+    if (response.status === 429) showSummarySetup('The shared AI service is busy. Please wait a minute and retry.');
     throw new Error(data.error || (response.status === 404 ? 'AI summary service is not connected yet.' : `AI summary request failed (HTTP ${response.status}).`));
   }
   if (!data || !data.summary || typeof data.summary.executiveSummary !== 'string') {
@@ -128,21 +122,16 @@ async function translateCurrentTranscript() {
   $('translationStatus').textContent = 'Translating transcript…';
   setTranslatedTranscript('Translating…');
   try {
-    const endpoint = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
-    const token = localStorage.getItem('memora-summary-token') || '';
-    if (!endpoint || !token) {
-      showSummarySetup('The MEMORA service URL is ready. Add the access token on this device to enable AI summaries and translations.');
-      throw new Error('AI service is not configured.');
-    }
+    const endpoint = DEFAULT_SUMMARY_ENDPOINT;
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ operation: 'translate', transcript: source, outputLanguage: targetLanguage })
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
       if (response.status === 404) showSummarySetup('The configured AI service URL was not found. Check that it ends with /api/summarize.');
-      if (response.status === 401) showSummarySetup('The access token was rejected. Re-enter the MEMORA_API_TOKEN for this device.');
+      if (response.status === 429) showSummarySetup('The shared AI service is busy. Please wait a minute and retry.');
       throw new Error(result.error || 'Translation service request failed.');
     }
     if (!result.translation || typeof result.translation !== 'string') throw new Error('Translation service returned no translated text.');
@@ -821,37 +810,16 @@ $('downloadTranscript').addEventListener('click', () => {
   downloadFile(new Blob([transcriptText], { type: 'text/plain;charset=utf-8' }), 'memora-transcript.txt');
 });
 
-$('saveSummarySettings').addEventListener('click', () => {
-  const endpoint = $('summaryEndpoint').value.trim() || DEFAULT_SUMMARY_ENDPOINT;
-  const token = $('summaryToken').value.trim();
-  localStorage.setItem('memora-summary-endpoint', endpoint);
-  if (token) localStorage.setItem('memora-summary-token', token);
-  else localStorage.removeItem('memora-summary-token');
-  if (!token) {
-    $('summarySettingsStatus').textContent = 'Service URL saved. Add the access token to enable summaries on this device.';
-    return;
-  }
-  $('summarySettingsStatus').textContent = 'Checking the service and token…';
-  const healthUrl = endpoint.replace(/\/api\/summarize\/?$/, '/api/health');
-  fetch(healthUrl, { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' })
-    .then(async response => {
-      const result = await response.json().catch(() => ({}));
-      if (response.status === 401) throw new Error('Token rejected. Check that you entered the current MEMORA_API_TOKEN.');
-      if (!response.ok) throw new Error(result.error || `Service check failed (HTTP ${response.status}).`);
-      $('summarySettingsStatus').textContent = 'Connected. The AI service and token are ready on this device.';
-    })
-    .catch(error => {
-      $('summarySettingsStatus').textContent = error.message.includes('Failed to fetch')
-        ? 'Could not reach the service. Check the URL and internet connection.'
-        : error.message;
-    });
-});
-$('summaryEndpoint').value = localStorage.getItem('memora-summary-endpoint') || DEFAULT_SUMMARY_ENDPOINT;
-$('summaryToken').value = localStorage.getItem('memora-summary-token') || '';
-if (!$('summaryToken').value) {
-  $('summarySettings').open = true;
-  $('summarySettingsStatus').textContent = 'AI is not connected on this device yet. Paste your MEMORA_API_TOKEN below and save to turn on summaries and translations.';
-}
+fetch(DEFAULT_SUMMARY_ENDPOINT.replace(/\/api\/summarize\/?$/, '/api/health'), { cache: 'no-store' })
+  .then(response => {
+    if (!response.ok) throw new Error('Service check failed (HTTP ' + response.status + ').');
+    $('summarySettingsStatus').textContent = 'Shared AI service is ready on this device.';
+  })
+  .catch(error => {
+    $('summarySettingsStatus').textContent = error.message.includes('Failed to fetch')
+      ? 'Could not reach the shared AI service. Check your internet connection.'
+      : error.message;
+  });
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -867,3 +835,4 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 renderSessions().catch(() => {
   $('sessions').innerHTML = '<div class="empty">Storage is unavailable in this browser.</div>';
 });
+
